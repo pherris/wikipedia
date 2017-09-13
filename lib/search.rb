@@ -17,8 +17,14 @@ class Search
     while true
       break if @found_kevin.value > 0
       pool.post do
-        title, depth = queue.shift
-        find_links(title, depth)
+        begin
+          title, depth = queue.shift
+          next if title.nil?
+          find_links(title, depth)
+        rescue => e
+          p e
+          raise e
+        end
       end
       # log some info about progress
       if Time.now - 2 > logged_at
@@ -46,6 +52,7 @@ class Search
       break if @found_kevin.value > 0
       url_with_continue = URI.encode("#{url}#{continue}")
       response = JSON.load(open(URI.parse(url_with_continue)))
+      p response
       # include? is not quite as elegant as parsing out each title and checking
       # it, but this gets it done as soon as possible
       if response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\""
@@ -61,12 +68,13 @@ class Search
       #handle errors
       raise response['error'] unless response['error'].nil?
       p response['warnings'] unless response['warnings'].nil?
-      break unless response['batchcomplete'].nil?
-      break if response['continue'].nil?
+      break if response['query'].nil?
       break if depth > MAX_DEPTH
 
       # create the next continue url params
-      response['continue'].each { |key, value| continue += "&#{key}=#{value}" }
+      response['continue'].each { |key, value| continue += "&#{key}=#{value}" } unless response['continue'].nil?
+
+      # TODO if continue is not present, add to a completed title cache
 
       # parse the response
       # making an assumption here about the structure of the wikipedia resp.
