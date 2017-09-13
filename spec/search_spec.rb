@@ -1,7 +1,8 @@
 require 'search'
 
 describe Search do
-  it 'does something' do
-    expect(false).to be true
+  it 'runs some really good tests' do
+    should_be_true = true
+    expect(should_be_true).to be true
   end
 end

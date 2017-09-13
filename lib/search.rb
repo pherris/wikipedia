@@ -21,7 +21,7 @@ class Search
         find_links(title, depth)
       end
       # log some info about progress
-      if Time.now - 20 > logged_at
+      if Time.now - 2 > logged_at
         logged_at = Time.now
         log
         # poor mans check to see if no results were returned, could use some extra validation about the initial search
@@ -49,7 +49,7 @@ class Search
       # include? is not quite as elegant as parsing out each title and checking
       # it, but this gets it done as soon as possible
       if response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\""
-        p title
+        p "Found a reference to Kevin on page titled: '#{title}'"
         @found_kevin.update { depth }
         break
       end
@@ -77,6 +77,7 @@ class Search
       newDepth = depth + 1
       titles_to_search = pages[page_key]['links'].collect { |link| [link['title'], newDepth] }
       title_counter.increment titles_to_search.length
+      # concat is much more efficient than pushing them one at a time
       queue.concat titles_to_search
     end
   end
