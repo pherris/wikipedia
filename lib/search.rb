@@ -47,18 +47,22 @@ class Search
     limit = 500
     url = "https://en.wikipedia.org/w/api.php?format=json&action=query&prop=links&pllimit=#{limit}&titles=#{title}"
     continue = '&continue='
+    return if not_linked_from.include? title
 
     while true
       break if @found_kevin.value > 0
+      break if not_linked_from.include? title
       url_with_continue = URI.encode("#{url}#{continue}")
       response = JSON.load(open(URI.parse(url_with_continue)))
-      p response
       # include? is not quite as elegant as parsing out each title and checking
       # it, but this gets it done as soon as possible
-      if response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\""
-        p "Found a reference to Kevin on page titled: '#{title}'"
+      if (response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\"") && (@found_kevin.value == 0)
+        p "Found a reference to Kevin on page titled: '#{title}', it can take a second to shut down"
         @found_kevin.update { depth }
+        queue.clear
         break
+      else
+        not_linked_from.push(title)
       end
       http_counter.increment
 
@@ -74,16 +78,14 @@ class Search
       # create the next continue url params
       response['continue'].each { |key, value| continue += "&#{key}=#{value}" } unless response['continue'].nil?
 
-      # TODO if continue is not present, add to a completed title cache
-
       # parse the response
       # making an assumption here about the structure of the wikipedia resp.
       pages = response['query']['pages']
       page_key = pages.keys.first
 
       # enqueue the titles to check
-      newDepth = depth + 1
-      titles_to_search = pages[page_key]['links'].collect { |link| [link['title'], newDepth] }
+      new_depth = depth + 1
+      titles_to_search = (pages[page_key]['links'] || []).collect { |link| [link['title'], new_depth] }
       title_counter.increment titles_to_search.length
       # concat is much more efficient than pushing them one at a time
       queue.concat titles_to_search
@@ -96,6 +98,10 @@ class Search
 
   def queue
     @queue ||= Concurrent::Array.new
+  end
+
+  def not_linked_from
+    @not_linked_from ||= Concurrent::Array.new
   end
 
   def title_counter
