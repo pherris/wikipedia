@@ -53,7 +53,7 @@ class Search
       break if @found_kevin.value > 0
       break if not_linked_from.include? title
       url_with_continue = URI.encode("#{url}#{continue}")
-      response = JSON.load(open(URI.parse(url_with_continue)))
+      response = JSON.load(wikipedia_api_call(URI.parse(url_with_continue)))
       # include? is not quite as elegant as parsing out each title and checking
       # it, but this gets it done as soon as possible
       if (response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\"") && (@found_kevin.value == 0)
@@ -61,8 +61,6 @@ class Search
         @found_kevin.update { depth }
         queue.clear
         break
-      else
-        not_linked_from.push(title)
       end
       http_counter.increment
 
@@ -78,6 +76,11 @@ class Search
       # create the next continue url params
       response['continue'].each { |key, value| continue += "&#{key}=#{value}" } unless response['continue'].nil?
 
+      # we've retrieved all the results for this page, and didn't find Kevin
+      if continue == ''
+        not_linked_from.push(title)
+      end
+
       # parse the response
       # making an assumption here about the structure of the wikipedia resp.
       pages = response['query']['pages']
@@ -90,6 +93,14 @@ class Search
       # concat is much more efficient than pushing them one at a time
       queue.concat titles_to_search
     end
+  end
+
+  def found_kevin
+    @found_kevin
+  end
+
+  def wikipedia_api_call(uri)
+    open(uri)
   end
 
   def pool

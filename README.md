@@ -1,3 +1,5 @@
+Clone, then `bundle install`.
+
 Run it like this:
 
 ```
