@@ -7,22 +7,23 @@ class Search
   MAX_DEPTH = 10
 
   def initialize
-    @found_kevin = Concurrent::AtomicFixnum.new
   end
 
   def find(title)
+    return 0 if title == SEARCHING_FOR
+
     find_links(title)
 
     logged_at = Time.now
     while true
-      break if @found_kevin.value > 0
+      break if found_kevin.value > 0
       pool.post do
         begin
           title, depth = queue.shift
           next if title.nil?
           find_links(title, depth)
         rescue => e
-          p e
+          p e.backtrace
           raise e
         end
       end
@@ -40,7 +41,7 @@ class Search
     # now wait for all work to complete, wait as long as it takes
     pool.wait_for_termination
 
-    return @found_kevin.value
+    return found_kevin.value
   end
 
   def find_links(title, depth = 1)
@@ -50,12 +51,13 @@ class Search
     return if not_linked_from.include? title
 
     while true
-      break if @found_kevin.value > 0
+      break if found_kevin.value > 0
       break if not_linked_from.include? title
       url_with_continue = URI.encode("#{url}#{continue}")
       response = JSON.load(wikipedia_api_call(URI.parse(url_with_continue)))
       # include? is not quite as elegant as parsing out each title and checking
       # it, but this gets it done as soon as possible
+
       if (response.to_s.include? "\"title\"=>\"#{SEARCHING_FOR}\"") && (@found_kevin.value == 0)
         p "Found a reference to Kevin on page titled: '#{title}', it can take a second to shut down"
         @found_kevin.update { depth }
@@ -81,6 +83,7 @@ class Search
         not_linked_from.push(title)
       end
 
+      p 3
       # parse the response
       # making an assumption here about the structure of the wikipedia resp.
       pages = response['query']['pages']
@@ -96,7 +99,7 @@ class Search
   end
 
   def found_kevin
-    @found_kevin
+    @found_kevin ||= Concurrent::AtomicFixnum.new
   end
 
   def wikipedia_api_call(uri)
